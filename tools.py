@@ -1,284 +1,454 @@
 """
-LXP - Advanced AI development Workshop: Chatbot tools
+LXP - Advanced AI development Workshop: Chatbot tools pour TMDB API
 
 WARNING: LangChain ConversationalAgent only accepts single input parameters for tool calling.
 Use create_string_input_tool() to wrap multi-parameter functions.
 """
 
+import os
 import requests
 from langchain_core.tools import tool
 from utils import create_string_input_tool
 
+# Get TMDB API key from environment
+TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+TMDB_BASE_URL = "https://api.themoviedb.org/3"
+
 @tool
-def geocode_city(city: str) -> str:
-    """Convert a city name to latitude and longitude coordinates using Open-Meteo geocoding API.
-    
+def search_movies(query: str) -> str:
+    """Search for movies by title using TMDB API.
+
     Args:
-        city: The name of the city to geocode
-        
+        query: The movie title or search term
+
     Returns:
-        A formatted string with coordinates and location information
+        A formatted string with search results including movie titles, release dates, and IDs
     """
     try:
-        # Geocode the city name to get coordinates
-        geocode_url = "https://geocoding-api.open-meteo.com/v1/search"
-        geocode_params = {
-            'name': city,
-            'count': 1,
-            'language': 'en',
-            'format': 'json'
+        url = f"{TMDB_BASE_URL}/search/movie"
+        params = {
+            'api_key': TMDB_API_KEY,
+            'query': query,
+            'language': 'en-US',
+            'page': 1
         }
-        
-        response = requests.get(geocode_url, params=geocode_params, timeout=10)
+
+        response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
         data = response.json()
-        
+
         if not data.get('results'):
-            return f"Error: City '{city}' not found. Please check the spelling and try again."
-        
-        # Extract coordinates and location info
-        location = data['results'][0]
-        latitude = location['latitude']
-        longitude = location['longitude']
-        location_name = location['name']
-        country = location.get('country', 'Unknown')
-        admin1 = location.get('admin1', '')
-        
-        # Build location display name
-        display_name = f"{location_name}"
-        if admin1:
-            display_name += f", {admin1}"
-        if country:
-            display_name += f", {country}"
-        
-        return f"📍 {display_name}\nLatitude: {latitude}\nLongitude: {longitude}"
-        
-    except Exception as e:
-        return f"Error: {str(e)}"
+            return f"No movies found for '{query}'. Please try a different search term."
 
-def get_temperature_by_coordinates(latitude: float, longitude: float) -> str:
-    """Get current temperature data for specific coordinates.
-    
+        # Format the results
+        results = []
+        for movie in data['results'][:5]:  # Limit to first 5 results
+            title = movie.get('title', 'Unknown Title')
+            release_date = movie.get('release_date', 'Unknown')
+            movie_id = movie.get('id')
+            overview = movie.get('overview', 'No description available')
+
+            # Truncate overview if too long
+            if len(overview) > 100:
+                overview = overview[:100] + "..."
+
+            results.append(f"🎬 {title} ({release_date})\nID: {movie_id}\n{overview}")
+
+        return "\n\n".join(results)
+
+    except Exception as e:
+        return f"Error searching movies: {str(e)}"
+
+@tool
+def get_movie_details(movie_id: str) -> str:
+    """Get detailed information about a specific movie by ID.
+
     Args:
-        latitude: The latitude coordinate (e.g., 40.7128)
-        longitude: The longitude coordinate (e.g., -74.0060)
-        
+        movie_id: The TMDB movie ID
+
     Returns:
-        JSON string with temperature data including current, feels_like, and daily min/max
+        A formatted string with detailed movie information
     """
     try:
-        # Get current and daily temperature data
-        weather_url = "https://api.open-meteo.com/v1/forecast"
+        url = f"{TMDB_BASE_URL}/movie/{movie_id}"
         params = {
-            'latitude': latitude,
-            'longitude': longitude,
-            'current': ['temperature_2m', 'apparent_temperature'],
-            'daily': ['temperature_2m_max', 'temperature_2m_min'],
-            'timezone': 'auto',
-            'forecast_days': 1
+            'api_key': TMDB_API_KEY,
+            'language': 'en-US'
         }
-        
-        response = requests.get(weather_url, params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        
-        result = {
-            'current_temperature': data['current']['temperature_2m'],
-            'feels_like': data['current']['apparent_temperature'],
-            'daily_max': data['daily']['temperature_2m_max'][0],
-            'daily_min': data['daily']['temperature_2m_min'][0],
-            'unit': data['current_units']['temperature_2m']
-        }
-        
-        return str(result)
-        
-    except Exception as e:
-        return f"Error: {str(e)}"
 
-def get_precipitation_by_coordinates(latitude: float, longitude: float) -> str:
-    """Get current precipitation data for specific coordinates.
-    
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        movie = response.json()
+
+        # Extract movie details
+        title = movie.get('title', 'Unknown Title')
+        release_date = movie.get('release_date', 'Unknown')
+        runtime = movie.get('runtime', 'Unknown')
+        rating = movie.get('vote_average', 'N/A')
+        vote_count = movie.get('vote_count', 0)
+        overview = movie.get('overview', 'No description available')
+        budget = movie.get('budget', 0)
+        revenue = movie.get('revenue', 0)
+
+        # Get genres
+        genres = [genre['name'] for genre in movie.get('genres', [])]
+        genres_str = ", ".join(genres) if genres else "Unknown"
+
+        # Get production companies
+        companies = [company['name'] for company in movie.get('production_companies', [])]
+        companies_str = ", ".join(companies[:3]) if companies else "Unknown"  # Limit to 3
+
+        # Format budget and revenue
+        budget_str = f"${budget:,}" if budget > 0 else "Unknown"
+        revenue_str = f"${revenue:,}" if revenue > 0 else "Unknown"
+
+        result = f"""🎬 {title} ({release_date})
+⭐ Rating: {rating}/10 ({vote_count} votes)
+⏱️ Runtime: {runtime} minutes
+🎭 Genres: {genres_str}
+🏢 Production: {companies_str}
+💰 Budget: {budget_str}
+💵 Revenue: {revenue_str}
+
+📝 Overview:
+{overview}"""
+
+        return result
+
+    except Exception as e:
+        return f"Error getting movie details: {str(e)}"
+
+def get_cast_by_movie_id(movie_id: int) -> str:
+    """Get cast information for a specific movie by ID.
+
     Args:
-        latitude: The latitude coordinate (e.g., 40.7128)
-        longitude: The longitude coordinate (e.g., -74.0060)
-        
+        movie_id: The TMDB movie ID (integer)
+
     Returns:
-        JSON string with precipitation data including current, rain, snow, and daily totals
+        A formatted string with cast information
     """
     try:
-        # Get precipitation data
-        weather_url = "https://api.open-meteo.com/v1/forecast"
+        url = f"{TMDB_BASE_URL}/movie/{movie_id}/credits"
         params = {
-            'latitude': latitude,
-            'longitude': longitude,
-            'current': ['precipitation', 'rain', 'showers', 'snowfall', 'weather_code'],
-            'daily': ['precipitation_sum', 'rain_sum', 'snowfall_sum', 'precipitation_probability_max'],
-            'timezone': 'auto',
-            'forecast_days': 1
+            'api_key': TMDB_API_KEY,
+            'language': 'en-US'
         }
-        
-        response = requests.get(weather_url, params=params, timeout=10)
+
+        response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
         data = response.json()
-        
-        # Weather code descriptions
-        weather_descriptions = {
-            0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
-            45: "Fog", 48: "Depositing rime fog",
-            51: "Light drizzle", 53: "Moderate drizzle", 55: "Dense drizzle",
-            56: "Light freezing drizzle", 57: "Dense freezing drizzle",
-            61: "Slight rain", 63: "Moderate rain", 65: "Heavy rain",
-            66: "Light freezing rain", 67: "Heavy freezing rain",
-            71: "Slight snow", 73: "Moderate snow", 75: "Heavy snow",
-            77: "Snow grains",
-            80: "Slight rain showers", 81: "Moderate rain showers", 82: "Violent rain showers",
-            85: "Slight snow showers", 86: "Heavy snow showers",
-            95: "Thunderstorm", 96: "Thunderstorm with slight hail", 99: "Thunderstorm with heavy hail"
-        }
-        
-        weather_code = data['current']['weather_code']
-        
-        result = {
-            'current': {
-                'total_precipitation': data['current']['precipitation'],
-                'rain': data['current']['rain'],
-                'showers': data['current']['showers'], 
-                'snowfall': data['current']['snowfall'],
-                'weather_condition': weather_descriptions.get(weather_code, f"Unknown ({weather_code})")
-            },
-            'daily': {
-                'precipitation_sum': data['daily']['precipitation_sum'][0],
-                'rain_sum': data['daily']['rain_sum'][0],
-                'snowfall_sum': data['daily']['snowfall_sum'][0],
-                'precipitation_probability': data['daily']['precipitation_probability_max'][0]
-            },
-            'unit': data['current_units']['precipitation']
-        }
-        
-        return str(result)
-        
-    except Exception as e:
-        return f"Error: {str(e)}"
 
-def get_wind_by_coordinates(latitude: float, longitude: float) -> str:
-    """Get current wind data for specific coordinates.
-    
+        cast = data.get('cast', [])
+        crew = data.get('crew', [])
+
+        if not cast and not crew:
+            return f"No cast information found for movie ID {movie_id}."
+
+        result = []
+
+        # Get main cast (first 5 actors)
+        if cast:
+            result.append("🎭 Main Cast:")
+            for actor in cast[:5]:
+                name = actor.get('name', 'Unknown')
+                character = actor.get('character', 'Unknown role')
+                result.append(f"  • {name} as {character}")
+
+        # Get director
+        directors = [person for person in crew if person.get('job') == 'Director']
+        if directors:
+            result.append("\n🎬 Director(s):")
+            for director in directors:
+                result.append(f"  • {director.get('name', 'Unknown')}")
+
+        return "\n".join(result)
+
+    except Exception as e:
+        return f"Error getting cast information: {str(e)}"
+
+def get_reviews_by_movie_id(movie_id: int) -> str:
+    """Get reviews for a specific movie by ID.
+
     Args:
-        latitude: The latitude coordinate (e.g., 40.7128)
-        longitude: The longitude coordinate (e.g., -74.0060)
-        
+        movie_id: The TMDB movie ID (integer)
+
     Returns:
-        JSON string with wind data including speed, direction, gusts
+        A formatted string with movie reviews
     """
     try:
-        # Get wind data
-        weather_url = "https://api.open-meteo.com/v1/forecast"
+        url = f"{TMDB_BASE_URL}/movie/{movie_id}/reviews"
         params = {
-            'latitude': latitude,
-            'longitude': longitude,
-            'current': ['wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m'],
-            'daily': ['wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant'],
-            'timezone': 'auto',
-            'forecast_days': 1
+            'api_key': TMDB_API_KEY,
+            'language': 'en-US',
+            'page': 1
         }
-        
-        response = requests.get(weather_url, params=params, timeout=10)
+
+        response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
         data = response.json()
-        
-        def wind_direction_to_compass(degrees):
-            if degrees is None:
-                return "N/A"
-            directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", 
-                         "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
-            index = round(degrees / 22.5) % 16
-            return directions[index]
-        
-        current_direction = data['current']['wind_direction_10m']
-        daily_direction = data['daily']['wind_direction_10m_dominant'][0]
-        
-        result = {
-            'current': {
-                'wind_speed': data['current']['wind_speed_10m'],
-                'wind_direction_degrees': current_direction,
-                'wind_direction_compass': wind_direction_to_compass(current_direction),
-                'wind_gusts': data['current']['wind_gusts_10m']
-            },
-            'daily': {
-                'max_wind_speed': data['daily']['wind_speed_10m_max'][0],
-                'max_wind_gusts': data['daily']['wind_gusts_10m_max'][0],
-                'dominant_direction_degrees': daily_direction,
-                'dominant_direction_compass': wind_direction_to_compass(daily_direction)
-            },
-            'unit': data['current_units']['wind_speed_10m']
-        }
-        
-        return str(result)
-        
-    except Exception as e:
-        return f"Error: {str(e)}"
 
-def get_wind_forecast_by_coordinates(latitude: float, longitude: float) -> str:
-    """Get 7-day wind forecast for specific coordinates.
-    
-    Args:
-        latitude: The latitude coordinate (e.g., 40.7128)
-        longitude: The longitude coordinate (e.g., -74.0060)
-        
+        reviews = data.get('results', [])
+
+        if not reviews:
+            return f"No reviews found for movie ID {movie_id}."
+
+        result = ["📝 Movie Reviews:"]
+
+        for review in reviews[:3]:  # Limit to 3 reviews
+            author = review.get('author', 'Anonymous')
+            content = review.get('content', 'No content available')
+            rating = review.get('author_details', {}).get('rating')
+
+            # Truncate long reviews
+            if len(content) > 200:
+                content = content[:200] + "..."
+
+            rating_str = f" ({rating}/10)" if rating else ""
+            result.append(f"\n👤 {author}{rating_str}:")
+            result.append(f"   {content}")
+
+        return "\n".join(result)
+
+    except Exception as e:
+        return f"Error getting reviews: {str(e)}"
+
+@tool
+def get_popular_movies() -> str:
+    """Get currently popular movies from TMDB.
+
     Returns:
-        JSON string with 7-day wind forecast data
+        A formatted string with popular movies list
     """
     try:
-        # Get wind forecast data
-        weather_url = "https://api.open-meteo.com/v1/forecast"
+        url = f"{TMDB_BASE_URL}/movie/popular"
         params = {
-            'latitude': latitude,
-            'longitude': longitude,
-            'daily': [
-                'wind_speed_10m_max',
-                'wind_gusts_10m_max', 
-                'wind_direction_10m_dominant'
-            ],
-            'timezone': 'auto',
-            'forecast_days': 7
+            'api_key': TMDB_API_KEY,
+            'language': 'en-US',
+            'page': 1
         }
-        
-        response = requests.get(weather_url, params=params, timeout=10)
+
+        response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
         data = response.json()
-        
-        def wind_direction_to_compass(degrees):
-            if degrees is None:
-                return "N/A"
-            directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", 
-                         "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
-            index = round(degrees / 22.5) % 16
-            return directions[index]
-        
-        # Build forecast array
-        forecast = []
-        for i in range(len(data['daily']['time'])):
-            direction_degrees = data['daily']['wind_direction_10m_dominant'][i]
-            forecast.append({
-                'date': data['daily']['time'][i],
-                'max_wind_speed': data['daily']['wind_speed_10m_max'][i],
-                'max_wind_gusts': data['daily']['wind_gusts_10m_max'][i],
-                'dominant_direction_degrees': direction_degrees,
-                'dominant_direction_compass': wind_direction_to_compass(direction_degrees)
-            })
-        
-        result = {
-            'forecast': forecast,
-            'unit': data['daily_units']['wind_speed_10m_max']
-        }
-        
-        return str(result)
-        
+
+        movies = data.get('results', [])
+
+        if not movies:
+            return "No popular movies found."
+
+        result = ["🔥 Popular Movies:"]
+
+        for i, movie in enumerate(movies[:10], 1):  # Top 10
+            title = movie.get('title', 'Unknown Title')
+            release_date = movie.get('release_date', 'Unknown')
+            rating = movie.get('vote_average', 'N/A')
+            movie_id = movie.get('id')
+
+            result.append(f"{i}. {title} ({release_date}) - ⭐{rating}/10 [ID: {movie_id}]")
+
+        return "\n".join(result)
+
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"Error getting popular movies: {str(e)}"
+
+@tool
+def get_trending_movies() -> str:
+    """Get trending movies for today from TMDB.
+
+    Returns:
+        A formatted string with trending movies list
+    """
+    try:
+        url = f"{TMDB_BASE_URL}/trending/movie/day"
+        params = {
+            'api_key': TMDB_API_KEY,
+            'language': 'en-US'
+        }
+
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        movies = data.get('results', [])
+
+        if not movies:
+            return "No trending movies found."
+
+        result = ["📈 Trending Movies Today:"]
+
+        for i, movie in enumerate(movies[:10], 1):  # Top 10
+            title = movie.get('title', 'Unknown Title')
+            release_date = movie.get('release_date', 'Unknown')
+            rating = movie.get('vote_average', 'N/A')
+            movie_id = movie.get('id')
+
+            result.append(f"{i}. {title} ({release_date}) - ⭐{rating}/10 [ID: {movie_id}]")
+
+        return "\n".join(result)
+
+    except Exception as e:
+        return f"Error getting trending movies: {str(e)}"
+
+def discover_movies_by_genre_and_year(genre_id: int, year: int) -> str:
+    """Discover movies by genre and release year.
+
+    Args:
+        genre_id: The TMDB genre ID (e.g., 28 for Action, 35 for Comedy)
+        year: The release year (e.g., 2023)
+
+    Returns:
+        A formatted string with discovered movies
+    """
+    try:
+        url = f"{TMDB_BASE_URL}/discover/movie"
+        params = {
+            'api_key': TMDB_API_KEY,
+            'language': 'en-US',
+            'with_genres': genre_id,
+            'year': year,
+            'sort_by': 'popularity.desc',
+            'page': 1
+        }
+
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        movies = data.get('results', [])
+
+        if not movies:
+            return f"No movies found for genre ID {genre_id} in year {year}."
+
+        # Get genre name
+        genre_url = f"{TMDB_BASE_URL}/genre/movie/list"
+        genre_params = {'api_key': TMDB_API_KEY, 'language': 'en-US'}
+        genre_response = requests.get(genre_url, params=genre_params, timeout=10)
+        genre_data = genre_response.json()
+
+        genre_name = "Unknown Genre"
+        for genre in genre_data.get('genres', []):
+            if genre['id'] == genre_id:
+                genre_name = genre['name']
+                break
+
+        result = [f"🎭 {genre_name} Movies from {year}:"]
+
+        for i, movie in enumerate(movies[:8], 1):  # Top 8
+            title = movie.get('title', 'Unknown Title')
+            rating = movie.get('vote_average', 'N/A')
+            movie_id = movie.get('id')
+
+            result.append(f"{i}. {title} - ⭐{rating}/10 [ID: {movie_id}]")
+
+        return "\n".join(result)
+
+    except Exception as e:
+        return f"Error discovering movies: {str(e)}"
+
+def get_person_info(person_id: int) -> str:
+    """Get detailed information about a person (actor, director, etc.) by ID.
+
+    Args:
+        person_id: The TMDB person ID (integer)
+
+    Returns:
+        A formatted string with person information
+    """
+    try:
+        url = f"{TMDB_BASE_URL}/person/{person_id}"
+        params = {
+            'api_key': TMDB_API_KEY,
+            'language': 'en-US'
+        }
+
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        person = response.json()
+
+        name = person.get('name', 'Unknown')
+        birthday = person.get('birthday', 'Unknown')
+        place_of_birth = person.get('place_of_birth', 'Unknown')
+        biography = person.get('biography', 'No biography available')
+        known_for = person.get('known_for_department', 'Unknown')
+        popularity = person.get('popularity', 'N/A')
+
+        # Truncate biography if too long
+        if len(biography) > 300:
+            biography = biography[:300] + "..."
+
+        result = f"""👤 {name}
+🎭 Known for: {known_for}
+🎂 Born: {birthday}
+📍 Place of Birth: {place_of_birth}
+📊 Popularity: {popularity}
+
+📖 Biography:
+{biography}"""
+
+        return result
+
+    except Exception as e:
+        return f"Error getting person information: {str(e)}"
+
+def get_person_credits(person_id: int) -> str:
+    """Get movie credits for a person (actor, director, etc.) by ID.
+
+    Args:
+        person_id: The TMDB person ID (integer)
+
+    Returns:
+        A formatted string with person's movie credits
+    """
+    try:
+        url = f"{TMDB_BASE_URL}/person/{person_id}/movie_credits"
+        params = {
+            'api_key': TMDB_API_KEY,
+            'language': 'en-US'
+        }
+
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        cast = data.get('cast', [])
+        crew = data.get('crew', [])
+
+        result = []
+
+        # Get person name
+        person_url = f"{TMDB_BASE_URL}/person/{person_id}"
+        person_response = requests.get(person_url, params={'api_key': TMDB_API_KEY}, timeout=10)
+        person_name = person_response.json().get('name', 'Unknown Person')
+
+        result.append(f"🎬 {person_name}'s Movie Credits:")
+
+        # Acting credits (top 5 most popular)
+        if cast:
+            cast_sorted = sorted(cast, key=lambda x: x.get('popularity', 0), reverse=True)
+            result.append("\n🎭 As Actor:")
+            for movie in cast_sorted[:5]:
+                title = movie.get('title', 'Unknown')
+                character = movie.get('character', 'Unknown role')
+                release_date = movie.get('release_date', 'Unknown')[:4]  # Just year
+                result.append(f"  • {title} ({release_date}) as {character}")
+
+        # Directing credits
+        directing_credits = [movie for movie in crew if movie.get('job') == 'Director']
+        if directing_credits:
+            result.append("\n🎬 As Director:")
+            for movie in directing_credits[:5]:
+                title = movie.get('title', 'Unknown')
+                release_date = movie.get('release_date', 'Unknown')[:4]  # Just year
+                result.append(f"  • {title} ({release_date})")
+
+        return "\n".join(result)
+
+    except Exception as e:
+        return f"Error getting person credits: {str(e)}"
 
 # Create the string input tool versions for LangChain
-get_city_temperature = create_string_input_tool(get_temperature_by_coordinates, "get_city_temperature")
-get_city_precipitation = create_string_input_tool(get_precipitation_by_coordinates, "get_city_precipitation") 
-get_city_wind = create_string_input_tool(get_wind_by_coordinates, "get_city_wind")
-get_city_wind_forecast = create_string_input_tool(get_wind_forecast_by_coordinates, "get_city_wind_forecast")
+get_movie_cast = create_string_input_tool(get_cast_by_movie_id, "get_movie_cast")
+get_movie_reviews = create_string_input_tool(get_reviews_by_movie_id, "get_movie_reviews")
+discover_movies_by_genre = create_string_input_tool(discover_movies_by_genre_and_year, "discover_movies_by_genre")
+get_person_details = create_string_input_tool(get_person_info, "get_person_details")
+get_person_movie_credits = create_string_input_tool(get_person_credits, "get_person_movie_credits")
