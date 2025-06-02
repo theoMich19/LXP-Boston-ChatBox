@@ -43,6 +43,11 @@ def setup_page():
             --champagne: #F7E7CE;
         }
         
+        /* Règle pour le texte blanc */
+        .stApp * {
+            color: white !important;
+        }
+        
         /* Votre CSS existant ici - je garde juste les parties essentielles pour l'exemple */
         .stApp {
             background: 

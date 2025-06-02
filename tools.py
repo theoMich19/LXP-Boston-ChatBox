@@ -9,9 +9,16 @@ import os
 import requests
 from langchain_core.tools import tool
 from utils import create_string_input_tool
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv("config.env")
 
 # Get TMDB API key from environment
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+if not TMDB_API_KEY:
+    raise ValueError("TMDB_API_KEY not found in environment variables. Please check your config.env file.")
+
 TMDB_BASE_URL = "https://api.themoviedb.org/3"
 
 @tool
@@ -25,6 +32,9 @@ def search_movies(query: str) -> str:
         A formatted string with search results including movie titles, release dates, and IDs
     """
     try:
+        if not TMDB_API_KEY:
+            return "Error: TMDB API key is not configured. Please check your config.env file."
+
         url = f"{TMDB_BASE_URL}/search/movie"
         params = {
             'api_key': TMDB_API_KEY,
@@ -33,7 +43,12 @@ def search_movies(query: str) -> str:
             'page': 1
         }
 
+        print(f"Making request to TMDB API with params: {params}")  # Debug log
         response = requests.get(url, params=params, timeout=10)
+        
+        if response.status_code != 200:
+            return f"Error: TMDB API returned status code {response.status_code}. Response: {response.text}"
+
         response.raise_for_status()
         data = response.json()
 
@@ -56,8 +71,10 @@ def search_movies(query: str) -> str:
 
         return "\n\n".join(results)
 
+    except requests.exceptions.RequestException as e:
+        return f"Network error while searching movies: {str(e)}"
     except Exception as e:
-        return f"Error searching movies: {str(e)}"
+        return f"Error searching movies: {str(e)}\nAPI Key: {TMDB_API_KEY[:5]}..."  # Show first 5 chars of API key for debugging
 
 @tool
 def get_movie_details(movie_id: str) -> str:
