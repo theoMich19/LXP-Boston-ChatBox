@@ -2,36 +2,27 @@ import streamlit as st
 import os
 from dotenv import load_dotenv
 
-# Imports pour l'intégration backend
 from langchain.memory import ConversationBufferMemory
 from langchain_community.callbacks import StreamlitCallbackHandler
 from langchain_community.chat_message_histories import StreamlitChatMessageHistory
 
-# Import de votre backend logique
 from backend import get_backend_instance
 
-# Charger les variables d'environnement
 load_dotenv('config.env')
 
-# Messages par défaut
-INITIAL_MESSAGE = "🎬 Bonsoir et bienvenue dans votre loge privée ! Je suis votre critique personnel, prêt à explorer avec vous l'univers fascinant du cinéma. Que souhaitez-vous découvrir ce soir ?"
-CHAT_INPUT_PLACEHOLDER = "🎭 Bonsoir ! De quel chef-d'œuvre cinématographique souhaitez-vous discuter ce soir ?"
+INITIAL_MESSAGE = "🎬 Good evening and welcome to your private screening room! I'm your personal film critic, ready to explore the fascinating world of cinema with you. What would you like to discover tonight?"
+CHAT_INPUT_PLACEHOLDER = "🎭 Good evening! Which cinematic masterpiece would you like to discuss tonight?"
 
 def setup_page():
-    """
-    Configure la page Streamlit avec un thème cinéma bordeaux luxueux.
-    """
     st.set_page_config(
-        page_title="🎬 CinéBot - Votre Critique de Cinéma IA",
+        page_title="🎬 CinéBot - Your AI Film Critic",
         page_icon="🎬",
         layout="wide",
         initial_sidebar_state="expanded"
     )
 
-    # CSS personnalisé avec palette bordeaux élégante (gardez tout votre CSS existant)
     st.markdown("""
         <style>
-        /* Palette de couleurs bordeaux raffinée */
         :root {
             --bordeaux-dark: #4A0E0E;
             --bordeaux-medium: #722F37;
@@ -43,12 +34,10 @@ def setup_page():
             --champagne: #F7E7CE;
         }
         
-        /* Règle pour le texte blanc */
         .stApp * {
             color: white !important;
         }
         
-        /* Votre CSS existant ici - je garde juste les parties essentielles pour l'exemple */
         .stApp {
             background: 
                 radial-gradient(ellipse at top, rgba(138, 75, 92, 0.08) 0%, transparent 60%),
@@ -116,127 +105,104 @@ def setup_page():
     """, unsafe_allow_html=True)
 
 def setup_main_page():
-    """
-    Crée la page principale avec l'ambiance cinéma bordeaux raffinée.
-    """
-    # Titre principal avec effet champagne-bordeaux
     st.markdown('<h1 class="main-title">🎭 CinéBot 🎬</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="subtitle">✨ Votre Critique Privé dans cette Loge de Cinéma d\'Exception ✨</p>', unsafe_allow_html=True)
+    st.markdown('<p class="subtitle">✨ Your Private Critic in this Exclusive Cinema Lounge ✨</p>', unsafe_allow_html=True)
 
-    # Section d'information sur les capacités avec style amélioré
     col1, col2, col3 = st.columns(3, gap="medium")
 
     with col1:
         st.markdown("""
         <div class="info-card">
-            <h3><span class="feature-icon">🎭</span>Expertise Cinématographique</h3>
-            <p>Analyses approfondies par un critique chevronné, dans l'intimité feutrée de votre salon privé.</p>
+            <h3><span class="feature-icon">🎭</span>Cinematic Expertise</h3>
+            <p>In-depth analysis by a seasoned critic, in the intimate setting of your private lounge.</p>
         </div>
         """, unsafe_allow_html=True)
 
     with col2:
         st.markdown("""
         <div class="info-card">
-            <h3><span class="feature-icon">🎬</span>Archives Exclusives</h3>
-            <p>Accès privilégié aux trésors du septième art : classiques intemporels et chef-d'œuvres contemporains.</p>
+            <h3><span class="feature-icon">🎬</span>Exclusive Archives</h3>
+            <p>Privileged access to the treasures of the seventh art: timeless classics and contemporary masterpieces.</p>
         </div>
         """, unsafe_allow_html=True)
 
     with col3:
         st.markdown("""
         <div class="info-card">
-            <h3><span class="feature-icon">🍿</span>Programmation Sur-Mesure</h3>
-            <p>Conseils personnalisés pour vos soirées cinéma, comme un concierge culturel dédié.</p>
+            <h3><span class="feature-icon">🍿</span>Tailor-Made Programming</h3>
+            <p>Personalized advice for your movie nights, like a dedicated cultural concierge.</p>
         </div>
         """, unsafe_allow_html=True)
 
 def setup_sidebar():
-    """
-    Crée une sidebar raffinée avec le thème bordeaux.
-    """
     with st.sidebar:
-        st.markdown('<h2 class="sidebar-header">🎪 Loge Privée</h2>', unsafe_allow_html=True)
+        st.markdown('<h2 class="sidebar-header">🎪 Private Lounge</h2>', unsafe_allow_html=True)
 
-        # Section menu principal avec style raffiné
-        with st.expander("🎯 Votre Menu Culturel", expanded=True):
+        with st.expander("🎯 Your Cultural Menu", expanded=True):
             st.markdown("""
-            🎭 **Bienvenue dans votre loge d'exception !**
+            🎭 **Welcome to your exceptional lounge!**
             
-            🍷 Votre sommelier culturel vous propose :
+            🍷 Your cultural sommelier offers:
             
-            • **🎬 Exploration des Archives** - Voyage à travers l'histoire du cinéma
-            • **🎭 Critiques d'Art** - Analyses esthétiques et narratives approfondies  
-            • **👑 Portraits de Légendes** - Biographies des maîtres du cinéma
-            • **💎 Secrets de l'Industrie** - Coulisses et anecdotes exclusives
+            • **🎬 Archive Exploration** - Journey through cinema history
+            • **🎭 Art Criticism** - In-depth aesthetic and narrative analysis  
+            • **👑 Legend Portraits** - Biographies of cinema masters
+            • **💎 Industry Secrets** - Behind-the-scenes and exclusive anecdotes
             """)
 
-        # Section suggestions culturelles
-        with st.expander("🎬 Suggestions Culturelles", expanded=False):
+        with st.expander("🎬 Cultural Suggestions", expanded=False):
             st.markdown("""
-            **🍷 Conversations de salon :**
+            **🍷 Lounge conversations:**
             
-            • *"Analyse-moi l'œuvre visionnaire de Stanley Kubrick"*
-            • *"Recommande-moi un film dans l'esprit de Casablanca"*
-            • *"Parle-moi de l'influence de la Nouvelle Vague"*
-            • *"Quels sont les secrets narratifs de Hitchcock ?"*
+            • *"Analyze Stanley Kubrick's visionary work"*
+            • *"Recommend a film in the spirit of Casablanca"*
+            • *"Tell me about the influence of the French New Wave"*
+            • *"What are Hitchcock's narrative secrets?"*
             """)
 
-        # Collection de genres raffinés
-        with st.expander("🎭 Notre Collection Exclusive"):
+        with st.expander("🎭 Our Exclusive Collection"):
             genres = [
-                "🎭 Drame d'Auteur", "😂 Comédie Sophistiquée", "🔫 Film Noir Classique",
-                "👻 Fantastique Poétique", "🚀 Science-Fiction Intellectuelle", "💕 Romance Intemporelle"
+                "🎭 Auteur Drama", "😂 Sophisticated Comedy", "🔫 Classic Film Noir",
+                "👻 Poetic Fantasy", "🚀 Intellectual Science Fiction", "💕 Timeless Romance"
             ]
 
             for genre in genres:
                 if st.button(genre, key=f"genre_{genre}"):
                     genre_clean = genre.split(' ', 1)[1] if ' ' in genre else genre
-                    st.session_state.suggested_input = f"Sélectionne-moi les plus beaux {genre_clean} pour une soirée d'exception"
+                    st.session_state.suggested_input = f"Select the most beautiful {genre_clean} for an exceptional evening"
 
         st.markdown("---")
 
-        # Bouton nouvelle session
         add_reset_button()
 
-        # Footer raffiné
         st.markdown("""
         ---
         <div style="text-align: center; color: var(--gold); font-family: Georgia, serif;">
-            <small>🎭 Votre Critique Personnel • Excellence IA</small><br>
-            <small>🍷 L'Art du Cinéma à Votre Service 🎬</small>
+            <small>🎭 Your Personal Critic • AI Excellence</small><br>
+            <small>🍷 The Art of Cinema at Your Service 🎬</small>
         </div>
         """, unsafe_allow_html=True)
 
 def add_reset_button():
-    """
-    Ajoute un bouton de reset dans la sidebar.
-    """
-    # Bouton nouvelle session avec style élégant
-    if st.button("🎬 Nouvelle Projection", help="Commencer une nouvelle séance cinématographique"):
-        # Reset des messages
+    if st.button("🎬 New Screening", help="Start a new cinematographic session"):
         if "messages" in st.session_state:
             st.session_state.messages = []
 
-        # Reset de la mémoire si elle existe
         if "memory" in st.session_state:
             st.session_state.memory.clear()
 
-        # Reset des étapes
         if "steps" in st.session_state:
             st.session_state.steps = {}
 
         st.rerun()
 
 def initialize_backend():
-    """
-    Initialise le backend si ce n'est pas déjà fait.
-    """
     if "backend" not in st.session_state:
         try:
             st.session_state.backend = get_backend_instance()
-            st.success("✅ Backend cinéma initialisé avec succès !")
+            st.success("✅ Cinema backend initialized successfully!")
         except Exception as e:
-            st.error(f"❌ Erreur d'initialisation du backend : {e}")
+            st.error(f"❌ Backend initialization error: {e}")
             st.stop()
 
     if "memory" not in st.session_state:
@@ -247,79 +213,58 @@ def initialize_backend():
         )
 
 def main():
-    """
-    Fonction principale qui orchestre l'interface complète.
-    """
-    # Configuration de la page
     setup_page()
 
-    # Initialisation du backend
     initialize_backend()
 
-    # Configuration de la sidebar
     setup_sidebar()
 
-    # Page principale
     setup_main_page()
 
-    # Initialisation de l'historique des messages
     if "messages" not in st.session_state:
         st.session_state.messages = []
-        # Message de bienvenue initial
         st.session_state.messages.append({
             "role": "assistant",
             "content": INITIAL_MESSAGE
         })
 
-    # Séparateur élégant
     st.markdown("---")
 
-    # Affichage de l'historique des conversations
     for message in st.session_state.messages:
         with st.chat_message(message["role"], avatar="🎭" if message["role"] == "assistant" else "👤"):
             st.markdown(message["content"])
 
-    # Zone de saisie avec style loge privée
     user_input = st.chat_input(CHAT_INPUT_PLACEHOLDER)
 
-    # Gestion des messages suggérés depuis la sidebar
     if 'suggested_input' in st.session_state:
         user_input = st.session_state.suggested_input
         del st.session_state.suggested_input
 
-    # Traitement des messages utilisateur
     if user_input:
-        # Ajouter le message utilisateur à l'historique
         st.session_state.messages.append({"role": "user", "content": user_input})
 
-        # Afficher le message utilisateur
         with st.chat_message("user", avatar="👤"):
             st.markdown(user_input)
 
-        # Générer et afficher la réponse du bot
         with st.chat_message("assistant", avatar="🎭"):
-            with st.spinner("🍷 Consultation de mes archives cinématographiques..."):
+            with st.spinner("🍷 Consulting my cinematographic archives..."):
                 try:
-                    # Utilisation du vrai backend
                     executor = st.session_state.backend.create_agent_executor(st.session_state.memory)
                     st_cb = StreamlitCallbackHandler(st.container(), expand_new_thoughts=False)
                     response = st.session_state.backend.process_message(user_input, executor, st_cb)
 
                     response_content = response["output"]
 
-                    # Stocker les étapes d'utilisation des outils
                     if "intermediate_steps" in response:
                         if "steps" not in st.session_state:
                             st.session_state.steps = {}
                         st.session_state.steps[str(len(st.session_state.messages))] = response["intermediate_steps"]
 
                 except Exception as e:
-                    # Fallback en cas d'erreur
-                    response_content = f"🎬 Je rencontre une difficulté technique dans mes archives. Erreur : {str(e)}"
+                    response_content = f"🎬 I'm experiencing a technical difficulty with my archives. Error: {str(e)}"
 
                 st.markdown(response_content)
 
-                # Ajouter la réponse à l'historique
                 st.session_state.messages.append({"role": "assistant", "content": response_content})
 
 if __name__ == "__main__":
